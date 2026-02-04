@@ -280,6 +280,15 @@ export type MemorySearchConfig = {
       maxEntries?: number;
     };
   };
+  /** Document loaders to enable beyond the default markdown loader. */
+  loaders?: {
+    /** Enable plain text file indexing (.txt, .log). Default: false. */
+    text?: boolean;
+    /** Enable code file indexing (.ts, .js, .py, etc.). Default: false. */
+    code?: boolean;
+    /** Enable HTML file indexing (.html, .htm). Default: false. */
+    html?: boolean;
+  };
   /** Chunking configuration. */
   chunking?: {
     tokens?: number;
@@ -312,6 +321,17 @@ export type MemorySearchConfig = {
       textWeight?: number;
       /** Multiplier for candidate pool size (default: 4). */
       candidateMultiplier?: number;
+    };
+    /** Post-retrieval re-ranking heuristics. */
+    rerank?: {
+      /** Enable re-ranking (default: true). */
+      enabled?: boolean;
+      /** Extra score boost for query term matches in snippet (default: 0.15). */
+      termMatchBoost?: number;
+      /** Penalize snippets shorter than this (chars, default: 50). */
+      minSnippetChars?: number;
+      /** Per-source score multiplier (default: { memory: 1.0, sessions: 0.9 }). */
+      sourceWeights?: Record<string, number>;
     };
   };
   /** Index cache behavior. */

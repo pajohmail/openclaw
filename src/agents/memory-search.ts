@@ -63,6 +63,12 @@ export type ResolvedMemorySearchConfig = {
       textWeight: number;
       candidateMultiplier: number;
     };
+    rerank?: {
+      enabled?: boolean;
+      termMatchBoost?: number;
+      minSnippetChars?: number;
+      sourceWeights?: Record<string, number>;
+    };
   };
   cache: {
     enabled: boolean;
@@ -274,6 +280,12 @@ function mergeConfig(
         vectorWeight: normalizedVectorWeight,
         textWeight: normalizedTextWeight,
         candidateMultiplier,
+      },
+      rerank: overrides?.query?.rerank ?? defaults?.query?.rerank ?? {
+        enabled: true,
+        termMatchBoost: 0.15,
+        minSnippetChars: 50,
+        sourceWeights: { memory: 1.0, sessions: 0.9 },
       },
     },
     cache: {

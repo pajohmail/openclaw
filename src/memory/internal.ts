@@ -54,7 +54,7 @@ export function isMemoryPath(relPath: string): boolean {
   return normalized.startsWith("memory/");
 }
 
-async function walkDir(dir: string, files: string[]) {
+async function walkDir(dir: string, files: string[], supportedExtensions?: Set<string>) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
@@ -62,13 +62,18 @@ async function walkDir(dir: string, files: string[]) {
       continue;
     }
     if (entry.isDirectory()) {
-      await walkDir(full, files);
+      await walkDir(full, files, supportedExtensions);
       continue;
     }
     if (!entry.isFile()) {
       continue;
     }
-    if (!entry.name.endsWith(".md")) {
+    if (supportedExtensions) {
+      const ext = path.extname(entry.name).toLowerCase();
+      if (!supportedExtensions.has(ext)) {
+        continue;
+      }
+    } else if (!entry.name.endsWith(".md")) {
       continue;
     }
     files.push(full);
@@ -78,31 +83,39 @@ async function walkDir(dir: string, files: string[]) {
 export async function listMemoryFiles(
   workspaceDir: string,
   extraPaths?: string[],
+  supportedExtensions?: Set<string>,
 ): Promise<string[]> {
   const result: string[] = [];
   const memoryFile = path.join(workspaceDir, "MEMORY.md");
   const altMemoryFile = path.join(workspaceDir, "memory.md");
   const memoryDir = path.join(workspaceDir, "memory");
 
-  const addMarkdownFile = async (absPath: string) => {
+  const isAcceptedFile = (absPath: string) => {
+    if (supportedExtensions) {
+      return supportedExtensions.has(path.extname(absPath).toLowerCase());
+    }
+    return absPath.endsWith(".md");
+  };
+
+  const addFile = async (absPath: string) => {
     try {
       const stat = await fs.lstat(absPath);
       if (stat.isSymbolicLink() || !stat.isFile()) {
         return;
       }
-      if (!absPath.endsWith(".md")) {
+      if (!isAcceptedFile(absPath)) {
         return;
       }
       result.push(absPath);
     } catch {}
   };
 
-  await addMarkdownFile(memoryFile);
-  await addMarkdownFile(altMemoryFile);
+  await addFile(memoryFile);
+  await addFile(altMemoryFile);
   try {
     const dirStat = await fs.lstat(memoryDir);
     if (!dirStat.isSymbolicLink() && dirStat.isDirectory()) {
-      await walkDir(memoryDir, result);
+      await walkDir(memoryDir, result, supportedExtensions);
     }
   } catch {}
 
@@ -115,10 +128,10 @@ export async function listMemoryFiles(
           continue;
         }
         if (stat.isDirectory()) {
-          await walkDir(inputPath, result);
+          await walkDir(inputPath, result, supportedExtensions);
           continue;
         }
-        if (stat.isFile() && inputPath.endsWith(".md")) {
+        if (stat.isFile() && isAcceptedFile(inputPath)) {
           result.push(inputPath);
         }
       } catch {}
