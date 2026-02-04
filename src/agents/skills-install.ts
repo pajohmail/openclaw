@@ -364,6 +364,18 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
     };
   }
 
+  // Block installation of skills that failed security validation
+  if (entry.securityResult?.verdict === "block") {
+    const count = entry.securityResult.findings.length;
+    return {
+      ok: false,
+      message: `Skill "${params.skillName}" blocked by security scan (${count} finding(s)). Run with skills.security.level: "off" to override.`,
+      stdout: "",
+      stderr: "",
+      code: null,
+    };
+  }
+
   const spec = findInstallSpec(entry, params.installId);
   if (!spec) {
     return {

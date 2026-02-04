@@ -23,6 +23,7 @@ import {
   resolveSkillInvocationPolicy,
 } from "./frontmatter.js";
 import { resolvePluginSkillDirs } from "./plugin-skills.js";
+import { validateSkillSecurity, type SecurityLevel } from "./security-validator.js";
 import { serializeByKey } from "./serialize.js";
 
 const fsp = fs.promises;
@@ -48,6 +49,16 @@ function filterSkillEntries(
   eligibility?: SkillEligibilityContext,
 ): SkillEntry[] {
   let filtered = entries.filter((entry) => shouldIncludeSkill({ entry, config, eligibility }));
+  // Filter out skills blocked by security validation
+  filtered = filtered.filter((entry) => {
+    if (entry.securityResult?.verdict === "block") {
+      skillsLogger.warn(
+        `Skill "${entry.skill.name}" excluded: blocked by security scan (${entry.securityResult.findings.length} finding(s))`,
+      );
+      return false;
+    }
+    return true;
+  });
   // If skillFilter is provided, only include skills in the filter list.
   if (skillFilter !== undefined) {
     const normalized = skillFilter.map((entry) => String(entry).trim()).filter(Boolean);
@@ -170,20 +181,35 @@ function loadSkillEntries(
     merged.set(skill.name, skill);
   }
 
+  const securityLevel: SecurityLevel =
+    (opts?.config?.skills?.security?.level as SecurityLevel | undefined) ?? "normal";
+
   const skillEntries: SkillEntry[] = Array.from(merged.values()).map((skill) => {
     let frontmatter: ParsedSkillFrontmatter = {};
+    let rawContent = "";
     try {
-      const raw = fs.readFileSync(skill.filePath, "utf-8");
-      frontmatter = parseFrontmatter(raw);
+      rawContent = fs.readFileSync(skill.filePath, "utf-8");
+      frontmatter = parseFrontmatter(rawContent);
     } catch {
       // ignore malformed skills
     }
-    return {
+    const metadata = resolveOpenClawMetadata(frontmatter);
+    const entry: SkillEntry = {
       skill,
       frontmatter,
-      metadata: resolveOpenClawMetadata(frontmatter),
+      metadata,
       invocation: resolveSkillInvocationPolicy(frontmatter),
     };
+    // Run security validation
+    if (securityLevel !== "off") {
+      entry.securityResult = validateSkillSecurity({
+        skillName: skill.name,
+        content: rawContent,
+        installSpecs: metadata?.install,
+        level: securityLevel,
+      });
+    }
+    return entry;
   });
   return skillEntries;
 }

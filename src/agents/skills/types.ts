@@ -68,6 +68,7 @@ export type SkillEntry = {
   frontmatter: ParsedSkillFrontmatter;
   metadata?: OpenClawSkillMetadata;
   invocation?: SkillInvocationPolicy;
+  securityResult?: import("./security-validator.js").SkillSecurityResult;
 };
 
 export type SkillEligibilityContext = {

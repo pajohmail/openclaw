@@ -18,6 +18,62 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
 </p>
 
+---
+
+## Fork: pajohmail/openclaw
+
+This is a hardened fork of OpenClaw with security improvements, an approval gate system, enhanced RAG capabilities, and a skill security validator.
+
+### Changes in this fork
+
+**Security hardening**
+- SQL identifier validation (`src/memory/sql-identifiers.ts`) — defense-in-depth against SQL injection via interpolated table/column names
+- Atomic credential writes (`src/web/auth-store.ts`) — fixes TOCTOU race condition using write-to-temp + rename
+- Webhook input validation (`src/telegram/webhook.ts`) — validates port, path, and host before starting
+- Browser evaluate guard (`src/browser/evaluate-guard.ts`) — size limit on payloads passed to `page.evaluate()`
+- Media server hardening (`src/media/server.ts`) — structured logging for path traversal attempts and cleanup failures
+
+**Skill approval gate** (`src/approval/`)
+- Requires explicit user approval before installing skill dependencies or auto-enabling plugins
+- Config-driven: `approvals.skillInstall.requireApproval` (default: `true`)
+- Session-scoped approval tracking (approve once per session)
+
+**Skill security validator** (`src/agents/skills/security-validator.ts`)
+- Automatic scanning of all skills before they are loaded or installed
+- Detects: shell injection (curl|bash), code execution (eval/new Function), data exfiltration, credential harvesting, obfuscation (base64/hex payloads), filesystem attacks (rm -rf), reverse shells, privilege escalation
+- Validates install spec URLs against known-safe registries, flags raw IPs, URL shorteners, suspicious TLDs
+- Blocked skills are excluded from the agent and cannot have dependencies installed
+- Configurable via `skills.security.level`: `"normal"` (default), `"strict"`, `"off"`
+
+**RAG improvements** (`src/memory/`)
+- Document loaders (`document-loaders.ts`) — extensible file ingestion for markdown, text, code, and HTML
+- Content-aware chunking (`chunking.ts`) — splits by headings (markdown), blank lines (code), or paragraphs (text)
+- Query result cache (`query-cache.ts`) — LRU cache with TTL to avoid redundant searches
+- Re-ranker (`reranker.ts`) — post-retrieval score adjustment using term matching, snippet length, and source weights
+
+### Configuration (openclaw.json)
+
+```json
+{
+  "skills": {
+    "requireInstallApproval": true,
+    "security": {
+      "level": "normal"
+    }
+  },
+  "approvals": {
+    "skillInstall": { "requireApproval": true },
+    "pluginAutoEnable": { "requireApproval": true }
+  }
+}
+```
+
+### Migration from upstream
+
+See [migrering.md](migrering.md) for a step-by-step guide to migrate from upstream OpenClaw to this fork.
+
+---
+
 **OpenClaw** is a _personal AI assistant_ you run on your own devices.
 It answers you on the channels you already use (WhatsApp, Telegram, Slack, Discord, Google Chat, Signal, iMessage, Microsoft Teams, WebChat), plus extension channels like BlueBubbles, Matrix, Zalo, and Zalo Personal. It can speak and listen on macOS/iOS/Android, and can render a live Canvas you control. The Gateway is just the control plane — the product is the assistant.
 

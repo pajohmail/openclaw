@@ -22,6 +22,11 @@ export type SkillsInstallConfig = {
   nodeManager?: "npm" | "pnpm" | "yarn" | "bun";
 };
 
+export type SkillsSecurityConfig = {
+  /** Validation strictness: "strict" blocks on warnings too, "off" disables scanning. Default: "normal". */
+  level?: "strict" | "normal" | "off";
+};
+
 export type SkillsConfig = {
   /** Optional bundled-skill allowlist (only affects bundled skills). */
   allowBundled?: string[];
@@ -30,4 +35,6 @@ export type SkillsConfig = {
   entries?: Record<string, SkillConfig>;
   /** Require explicit approval before installing skill dependencies. Default: true. */
   requireInstallApproval?: boolean;
+  /** Security scanning for skill content. */
+  security?: SkillsSecurityConfig;
 };
