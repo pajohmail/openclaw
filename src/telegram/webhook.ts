@@ -35,7 +35,7 @@ export async function startTelegramWebhook(opts: {
   const port = opts.port ?? 8787;
   const host = opts.host ?? "0.0.0.0";
 
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
     throw new Error(`Invalid webhook port: ${port}`);
   }
   if (!path.startsWith("/")) {

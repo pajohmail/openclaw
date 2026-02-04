@@ -77,7 +77,7 @@ export function attachMediaRoutes(
     } catch (err) {
       if (err instanceof SafeOpenError) {
         if (err.code === "invalid-path") {
-          log.warn({ id, error: String(err) }, "media request with invalid path (possible traversal)");
+          try { log.warn({ id, error: String(err) }, "media request with invalid path (possible traversal)"); } catch {}
           res.status(400).send("invalid path");
           return;
         }
