@@ -5,6 +5,7 @@ import {
   refLocator,
   restoreRoleRefsForTarget,
 } from "./pw-session.js";
+import { validateEvaluateInput } from "./evaluate-guard.js";
 import { normalizeTimeoutMs, requireRef, toAIFriendlyError } from "./pw-tools-core.shared.js";
 
 export async function highlightViaPlaywright(opts: {
@@ -225,6 +226,10 @@ export async function evaluateViaPlaywright(opts: {
   const fnText = String(opts.fn ?? "").trim();
   if (!fnText) {
     throw new Error("function is required");
+  }
+  const guard = validateEvaluateInput(fnText);
+  if (!guard.ok) {
+    throw new Error(guard.reason);
   }
   const page = await getPageForTargetId(opts);
   ensurePageState(page);

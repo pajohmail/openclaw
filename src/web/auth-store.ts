@@ -67,7 +67,10 @@ export function maybeRestoreCredsFromBackup(authDir: string): void {
 
     // Ensure backup is parseable before restoring.
     JSON.parse(backupRaw);
-    fsSync.copyFileSync(backupPath, credsPath);
+    // Atomic restore: write to temp file, then rename (same filesystem = atomic).
+    const tmpPath = `${credsPath}.tmp.${Date.now()}`;
+    fsSync.writeFileSync(tmpPath, backupRaw, "utf-8");
+    fsSync.renameSync(tmpPath, credsPath);
     logger.warn({ credsPath }, "restored corrupted WhatsApp creds.json from backup");
   } catch {
     // ignore

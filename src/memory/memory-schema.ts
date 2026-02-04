@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { assertSafeIdentifier } from "./sql-identifiers.js";
 
 export function ensureMemoryIndexSchema(params: {
   db: DatabaseSync;
@@ -6,6 +7,8 @@ export function ensureMemoryIndexSchema(params: {
   ftsTable: string;
   ftsEnabled: boolean;
 }): { ftsAvailable: boolean; ftsError?: string } {
+  assertSafeIdentifier(params.embeddingCacheTable, "embeddingCacheTable");
+  assertSafeIdentifier(params.ftsTable, "ftsTable");
   params.db.exec(`
     CREATE TABLE IF NOT EXISTS meta (
       key TEXT PRIMARY KEY,
@@ -88,6 +91,7 @@ function ensureColumn(
   column: string,
   definition: string,
 ): void {
+  assertSafeIdentifier(column, "ensureColumn.column");
   const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (rows.some((row) => row.name === column)) {
     return;

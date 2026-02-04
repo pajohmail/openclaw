@@ -4,8 +4,11 @@ import fs from "node:fs/promises";
 import { danger } from "../globals.js";
 import { SafeOpenError, openFileWithinRoot } from "../infra/fs-safe.js";
 import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
 import { detectMime } from "./mime.js";
 import { cleanOldMedia, getMediaDir, MEDIA_MAX_BYTES } from "./store.js";
+
+const log = createSubsystemLogger("media");
 
 const DEFAULT_TTL_MS = 2 * 60 * 1000;
 const MAX_MEDIA_ID_CHARS = 200;
@@ -50,7 +53,9 @@ export function attachMediaRoutes(
       }
       if (Date.now() - stat.mtimeMs > ttlMs) {
         await handle.close().catch(() => {});
-        await fs.rm(realPath).catch(() => {});
+        await fs.rm(realPath).catch((err) => {
+          log.debug({ path: realPath, error: String(err) }, "media cleanup failed (expired)");
+        });
         res.status(410).send("expired");
         return;
       }
@@ -64,12 +69,15 @@ export function attachMediaRoutes(
       // best-effort single-use cleanup after response ends
       res.on("finish", () => {
         setTimeout(() => {
-          fs.rm(realPath).catch(() => {});
+          fs.rm(realPath).catch((err) => {
+            log.debug({ path: realPath, error: String(err) }, "media cleanup failed (post-serve)");
+          });
         }, 50);
       });
     } catch (err) {
       if (err instanceof SafeOpenError) {
         if (err.code === "invalid-path") {
+          log.warn({ id, error: String(err) }, "media request with invalid path (possible traversal)");
           res.status(400).send("invalid path");
           return;
         }

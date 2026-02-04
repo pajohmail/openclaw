@@ -34,6 +34,17 @@ export async function startTelegramWebhook(opts: {
   const healthPath = opts.healthPath ?? "/healthz";
   const port = opts.port ?? 8787;
   const host = opts.host ?? "0.0.0.0";
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid webhook port: ${port}`);
+  }
+  if (!path.startsWith("/")) {
+    throw new Error(`Webhook path must start with "/": ${path}`);
+  }
+  if (!host) {
+    throw new Error("Webhook host must not be empty");
+  }
+
   const runtime = opts.runtime ?? defaultRuntime;
   const diagnosticsEnabled = isDiagnosticsEnabled(opts.config);
   const bot = createTelegramBot({

@@ -20,6 +20,9 @@ import { resolveSessionTranscriptsDirForAgent } from "../config/sessions/paths.j
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
 import { resolveUserPath } from "../utils.js";
+import { QueryCache } from "./query-cache.js";
+import { rerankResults } from "./reranker.js";
+import { assertSafeIdentifier } from "./sql-identifiers.js";
 import { runGeminiEmbeddingBatches, type GeminiBatchRequest } from "./batch-gemini.js";
 import {
   OPENAI_BATCH_ENDPOINT,
@@ -161,6 +164,7 @@ export class MemoryIndexManager implements MemorySearchManager {
   >();
   private sessionWarm = new Set<string>();
   private syncing: Promise<void> | null = null;
+  private queryCache: QueryCache;
 
   static async get(params: {
     cfg: OpenClawConfig;
@@ -240,6 +244,11 @@ export class MemoryIndexManager implements MemorySearchManager {
     this.ensureIntervalSync();
     this.dirty = this.sources.has("memory");
     this.batch = this.resolveBatchConfig();
+    this.queryCache = new QueryCache({
+      enabled: params.settings.cache.enabled,
+      maxEntries: 100,
+      ttlMs: 60_000,
+    });
   }
 
   async warmSession(sessionKey?: string): Promise<void> {
@@ -278,6 +287,13 @@ export class MemoryIndexManager implements MemorySearchManager {
     }
     const minScore = opts?.minScore ?? this.settings.query.minScore;
     const maxResults = opts?.maxResults ?? this.settings.query.maxResults;
+
+    // Check query cache first.
+    const cached = this.queryCache.get(cleaned, maxResults);
+    if (cached) {
+      return cached;
+    }
+
     const hybrid = this.settings.query.hybrid;
     const candidates = Math.min(
       200,
@@ -294,18 +310,27 @@ export class MemoryIndexManager implements MemorySearchManager {
       ? await this.searchVector(queryVec, candidates).catch(() => [])
       : [];
 
+    let results: MemorySearchResult[];
     if (!hybrid.enabled) {
-      return vectorResults.filter((entry) => entry.score >= minScore).slice(0, maxResults);
+      results = vectorResults.filter((entry) => entry.score >= minScore).slice(0, maxResults);
+    } else {
+      const merged = this.mergeHybridResults({
+        vector: vectorResults,
+        keyword: keywordResults,
+        vectorWeight: hybrid.vectorWeight,
+        textWeight: hybrid.textWeight,
+      });
+
+      // Apply post-retrieval re-ranking.
+      const reranked = rerankResults(merged, cleaned, this.settings.query.rerank);
+
+      results = reranked.filter((entry) => entry.score >= minScore).slice(0, maxResults);
     }
 
-    const merged = this.mergeHybridResults({
-      vector: vectorResults,
-      keyword: keywordResults,
-      vectorWeight: hybrid.vectorWeight,
-      textWeight: hybrid.textWeight,
-    });
+    // Populate query cache.
+    this.queryCache.set(cleaned, maxResults, results);
 
-    return merged.filter((entry) => entry.score >= minScore).slice(0, maxResults);
+    return results;
   }
 
   private async searchVector(
@@ -391,7 +416,10 @@ export class MemoryIndexManager implements MemorySearchManager {
     if (this.syncing) {
       return this.syncing;
     }
-    this.syncing = this.runSync(params).finally(() => {
+    this.syncing = this.runSync(params).then(() => {
+      // Invalidate query cache after successful sync since index contents changed.
+      this.queryCache.invalidate();
+    }).finally(() => {
       this.syncing = null;
     });
     return this.syncing;
@@ -690,6 +718,9 @@ export class MemoryIndexManager implements MemorySearchManager {
     const sources = Array.from(this.sources);
     if (sources.length === 0) {
       return { sql: "", params: [] };
+    }
+    if (alias) {
+      assertSafeIdentifier(alias, "buildSourceFilter.alias");
     }
     const column = alias ? `${alias}.source` : "source";
     const placeholders = sources.map(() => "?").join(", ");
