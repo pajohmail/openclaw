@@ -24,6 +24,20 @@ export type ExecApprovalForwardingConfig = {
   targets?: ExecApprovalForwardTarget[];
 };
 
+export type SkillInstallApprovalConfig = {
+  /** Require user approval before installing skill dependencies. Default: true. */
+  requireApproval?: boolean;
+};
+
+export type PluginAutoEnableApprovalConfig = {
+  /** Require user approval before auto-enabling detected plugins. Default: true. */
+  requireApproval?: boolean;
+};
+
 export type ApprovalsConfig = {
   exec?: ExecApprovalForwardingConfig;
+  /** Gate for automatic skill dependency installation. */
+  skillInstall?: SkillInstallApprovalConfig;
+  /** Gate for automatic plugin enable based on detected config. */
+  pluginAutoEnable?: PluginAutoEnableApprovalConfig;
 };

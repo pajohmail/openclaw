@@ -9,6 +9,13 @@ import { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
 import { runCommandWithTimeout } from "../process/exec.js";
 import { CONFIG_DIR, ensureDir, resolveUserPath } from "../utils.js";
 import {
+  type ApprovalHandler,
+  defaultApprovalHandler,
+  isAlreadyApproved,
+  markApproved,
+  resolveApprovalRequired,
+} from "../approval/index.js";
+import {
   hasBinary,
   loadWorkspaceSkillEntries,
   resolveSkillsInstallPreferences,
@@ -24,6 +31,8 @@ export type SkillInstallRequest = {
   installId: string;
   timeoutMs?: number;
   config?: OpenClawConfig;
+  /** Optional handler invoked when approval is required. Defaults to blocking. */
+  approvalHandler?: ApprovalHandler;
 };
 
 export type SkillInstallResult = {
@@ -365,6 +374,28 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
       code: null,
     };
   }
+
+  // Approval gate: require explicit consent before installing dependencies.
+  if (resolveApprovalRequired(params.config, "skill-install") && !isAlreadyApproved("skill-install", params.skillName)) {
+    const handler = params.approvalHandler ?? defaultApprovalHandler;
+    const approval = await handler({
+      kind: "skill-install",
+      id: params.skillName,
+      description: `Install ${spec.kind} dependency for skill "${params.skillName}"`,
+      source: ("package" in spec ? spec.package : undefined) ?? ("formula" in spec ? spec.formula : undefined) ?? ("url" in spec ? spec.url : undefined),
+    });
+    if (!approval.approved) {
+      return {
+        ok: false,
+        message: approval.reason ?? `Skill install not approved: ${params.skillName}`,
+        stdout: "",
+        stderr: "",
+        code: null,
+      };
+    }
+    markApproved("skill-install", params.skillName);
+  }
+
   if (spec.kind === "download") {
     return await installDownloadSpec({ entry, spec, timeoutMs });
   }

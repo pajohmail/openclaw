@@ -28,4 +28,6 @@ export type SkillsConfig = {
   load?: SkillsLoadConfig;
   install?: SkillsInstallConfig;
   entries?: Record<string, SkillConfig>;
+  /** Require explicit approval before installing skill dependencies. Default: true. */
+  requireInstallApproval?: boolean;
 };

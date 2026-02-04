@@ -1,4 +1,5 @@
 import type { OpenClawConfig } from "./config.js";
+import { resolveApprovalRequired } from "../approval/index.js";
 import { normalizeProviderId } from "../agents/model-selection.js";
 import {
   getChannelPluginCatalogEntry,
@@ -431,6 +432,8 @@ export function applyPluginAutoEnable(params: {
     return { config: next, changes };
   }
 
+  const requireApproval = resolveApprovalRequired(next, "plugin-auto-enable");
+
   for (const entry of configured) {
     if (isPluginDenied(next, entry.pluginId)) {
       continue;
@@ -445,6 +448,12 @@ export function applyPluginAutoEnable(params: {
     const allowMissing = Array.isArray(allow) && !allow.includes(entry.pluginId);
     const alreadyEnabled = next.plugins?.entries?.[entry.pluginId]?.enabled === true;
     if (alreadyEnabled && !allowMissing) {
+      continue;
+    }
+    // When approval is required, skip auto-enable — the user must explicitly
+    // enable the plugin via config (plugins.entries.<id>.enabled: true).
+    if (requireApproval && !alreadyEnabled) {
+      changes.push(`${formatAutoEnableChange(entry)} Requires approval — skipped. Enable via config: plugins.entries.${entry.pluginId}.enabled: true`);
       continue;
     }
     next = enablePluginEntry(next, entry.pluginId);
