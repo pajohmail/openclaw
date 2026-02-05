@@ -48,6 +48,13 @@ export async function runCli(argv: string[] = process.argv) {
   installUnhandledRejectionHandler();
 
   process.on("uncaughtException", (error) => {
+    if (
+      error instanceof TypeError &&
+      error.message === "Cannot read properties of null (reading 'setSession')"
+    ) {
+      console.warn("[openclaw] Transient TLS error (undici), ignoring:", error.message);
+      return;
+    }
     console.error("[openclaw] Uncaught exception:", formatUncaughtError(error));
     process.exit(1);
   });
