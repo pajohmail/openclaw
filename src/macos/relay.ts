@@ -58,7 +58,8 @@ async function main() {
   const { assertSupportedRuntime } = await import("../infra/runtime-guard.js");
   assertSupportedRuntime();
   const { formatUncaughtError } = await import("../infra/errors.js");
-  const { installUnhandledRejectionHandler } = await import("../infra/unhandled-rejections.js");
+  const { installUnhandledRejectionHandler, isTransientNetworkError } =
+    await import("../infra/unhandled-rejections.js");
 
   const { buildProgram } = await import("../cli/program.js");
   const program = buildProgram();
@@ -71,6 +72,10 @@ async function main() {
       error.message === "Cannot read properties of null (reading 'setSession')"
     ) {
       console.warn("[openclaw] Transient TLS error (undici), ignoring:", error.message);
+      return;
+    }
+    if (isTransientNetworkError(error)) {
+      console.warn("[openclaw] Transient network error (continuing):", formatUncaughtError(error));
       return;
     }
     console.error("[openclaw] Uncaught exception:", formatUncaughtError(error));

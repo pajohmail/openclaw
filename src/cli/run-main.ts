@@ -8,7 +8,10 @@ import { formatUncaughtError } from "../infra/errors.js";
 import { isMainModule } from "../infra/is-main.js";
 import { ensureOpenClawCliOnPath } from "../infra/path-env.js";
 import { assertSupportedRuntime } from "../infra/runtime-guard.js";
-import { installUnhandledRejectionHandler } from "../infra/unhandled-rejections.js";
+import {
+  installUnhandledRejectionHandler,
+  isTransientNetworkError,
+} from "../infra/unhandled-rejections.js";
 import { enableConsoleCapture } from "../logging.js";
 import { getPrimaryCommand, hasHelpOrVersion } from "./argv.js";
 import { tryRouteCli } from "./route.js";
@@ -53,6 +56,10 @@ export async function runCli(argv: string[] = process.argv) {
       error.message === "Cannot read properties of null (reading 'setSession')"
     ) {
       console.warn("[openclaw] Transient TLS error (undici), ignoring:", error.message);
+      return;
+    }
+    if (isTransientNetworkError(error)) {
+      console.warn("[openclaw] Transient network error (continuing):", formatUncaughtError(error));
       return;
     }
     console.error("[openclaw] Uncaught exception:", formatUncaughtError(error));
