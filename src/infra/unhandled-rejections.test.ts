@@ -62,7 +62,15 @@ describe("isTransientNetworkError", () => {
       "EPIPE",
       "EHOSTUNREACH",
       "ENETUNREACH",
+      "ENETDOWN",
+      "EHOSTDOWN",
+      "EADDRNOTAVAIL",
+      "ENOTCONN",
+      "ESHUTDOWN",
+      "EPROTO",
       "EAI_AGAIN",
+      "EAI_FAIL",
+      "ERR_SOCKET_CONNECTION_TIMEOUT",
       "UND_ERR_CONNECT_TIMEOUT",
       "UND_ERR_SOCKET",
       "UND_ERR_HEADERS_TIMEOUT",
@@ -91,6 +99,25 @@ describe("isTransientNetworkError", () => {
     const outerCause = Object.assign(new Error("wrapper"), { cause: innerCause });
     const error = Object.assign(new TypeError("fetch failed"), { cause: outerCause });
     expect(isTransientNetworkError(error)).toBe(true);
+  });
+
+  it("returns true for fetch failed with unrecognized cause code (TLS, etc.)", () => {
+    // TLS errors, unusual DNS failures, etc. should still be treated as transient
+    // when wrapped in TypeError: fetch failed
+    const tlsCause = Object.assign(new Error("unable to verify the first certificate"), {
+      code: "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+    });
+    const error = Object.assign(new TypeError("fetch failed"), { cause: tlsCause });
+    expect(isTransientNetworkError(error)).toBe(true);
+  });
+
+  it("returns true for fetch failed with non-Error cause", () => {
+    const error = Object.assign(new TypeError("fetch failed"), { cause: "unknown network issue" });
+    expect(isTransientNetworkError(error)).toBe(true);
+  });
+
+  it('returns true for "socket hang up" errors', () => {
+    expect(isTransientNetworkError(new Error("socket hang up"))).toBe(true);
   });
 
   it("returns true for AggregateError containing network errors", () => {

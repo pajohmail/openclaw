@@ -26,7 +26,15 @@ const TRANSIENT_NETWORK_CODES = new Set([
   "EPIPE",
   "EHOSTUNREACH",
   "ENETUNREACH",
+  "ENETDOWN",
+  "EHOSTDOWN",
+  "EADDRNOTAVAIL",
+  "ENOTCONN",
+  "ESHUTDOWN",
+  "EPROTO",
   "EAI_AGAIN",
+  "EAI_FAIL",
+  "ERR_SOCKET_CONNECTION_TIMEOUT",
   "UND_ERR_CONNECT_TIMEOUT",
   "UND_ERR_DNS_RESOLVE_FAILED",
   "UND_ERR_CONNECT",
@@ -94,12 +102,16 @@ export function isTransientNetworkError(err: unknown): boolean {
     return true;
   }
 
-  // "fetch failed" TypeError from undici (Node's native fetch)
+  // "fetch failed" TypeError from undici (Node's native fetch).
+  // This is ALWAYS a network-level error — treat as transient regardless of cause.
+  // Previously we recursed into the cause, but unknown cause codes (TLS errors,
+  // unusual DNS failures, etc.) would return false and crash the gateway.
   if (err instanceof TypeError && err.message === "fetch failed") {
-    const cause = getErrorCause(err);
-    if (cause) {
-      return isTransientNetworkError(cause);
-    }
+    return true;
+  }
+
+  // "socket hang up" from Node HTTP client — transient connection drop
+  if (err instanceof Error && err.message === "socket hang up") {
     return true;
   }
 
