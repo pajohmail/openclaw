@@ -546,7 +546,7 @@ export const registerTelegramNativeCommands = ({
             skippedNonSilent: 0,
           };
 
-          await dispatchReplyWithBufferedBlockDispatcher({
+          const { queuedFinal } = await dispatchReplyWithBufferedBlockDispatcher({
             ctx: ctxPayload,
             cfg,
             dispatcherOptions: {
@@ -583,7 +583,7 @@ export const registerTelegramNativeCommands = ({
               disableBlockStreaming,
             },
           });
-          if (!deliveryState.delivered && deliveryState.skippedNonSilent > 0) {
+          if (!deliveryState.delivered && !queuedFinal) {
             await deliverReplies({
               replies: [{ text: EMPTY_RESPONSE_FALLBACK }],
               chatId: String(chatId),

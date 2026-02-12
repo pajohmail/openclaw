@@ -285,7 +285,9 @@ export const dispatchTelegramMessage = async ({
   });
   draftStream?.stop();
   let sentFallback = false;
-  if (!deliveryState.delivered && deliveryState.skippedNonSilent > 0) {
+  // Send fallback when nothing was delivered and no final response was queued.
+  // This covers both "payloads skipped" (original) and "agent produced empty response" (new).
+  if (!deliveryState.delivered && !queuedFinal) {
     const result = await deliverReplies({
       replies: [{ text: EMPTY_RESPONSE_FALLBACK }],
       chatId: String(chatId),
