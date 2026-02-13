@@ -32,7 +32,7 @@ import {
   resolveMessageChannel,
 } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
-import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
+import { isSilentReplyText, SILENT_REPLY_TOKEN, stripSilentReplyToken } from "../tokens.js";
 import { buildThreadingToolContext, resolveEnforceFinalTag } from "./agent-runner-utils.js";
 import { createBlockReplyPayloadKey, type BlockReplyPipeline } from "./block-reply-pipeline.js";
 import { parseReplyDirectives } from "./reply-directives.js";
@@ -121,8 +121,9 @@ export async function runAgentTurnWithFallback(params: {
           }
           text = stripped.text;
         }
-        if (isSilentReplyText(text, SILENT_REPLY_TOKEN)) {
-          return { skip: true };
+        // Strip NO_REPLY token; only skip if text is purely the token.
+        if (text) {
+          text = stripSilentReplyToken(text, SILENT_REPLY_TOKEN);
         }
         if (!text) {
           return { skip: true };

@@ -3,7 +3,11 @@ import type { ReasoningLevel, VerboseLevel } from "../../../auto-reply/thinking.
 import type { OpenClawConfig } from "../../../config/config.js";
 import type { ToolResultFormat } from "../../pi-embedded-subscribe.js";
 import { parseReplyDirectives } from "../../../auto-reply/reply/reply-directives.js";
-import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../../../auto-reply/tokens.js";
+import {
+  isSilentReplyText,
+  SILENT_REPLY_TOKEN,
+  stripSilentReplyToken,
+} from "../../../auto-reply/tokens.js";
 import { formatToolAggregate } from "../../../auto-reply/tool-meta.js";
 import {
   formatAssistantErrorText,
@@ -243,11 +247,16 @@ export function buildEmbeddedRunPayloads(params: {
       replyToCurrent: item.replyToCurrent,
       audioAsVoice: item.audioAsVoice || Boolean(hasAudioAsVoiceTag && item.media?.length),
     }))
+    .map((p) => {
+      // Strip NO_REPLY token from text that contains real content alongside it.
+      if (p.text) {
+        const stripped = stripSilentReplyToken(p.text, SILENT_REPLY_TOKEN);
+        return { ...p, text: stripped || undefined };
+      }
+      return p;
+    })
     .filter((p) => {
       if (!p.text && !p.mediaUrl && (!p.mediaUrls || p.mediaUrls.length === 0)) {
-        return false;
-      }
-      if (p.text && isSilentReplyText(p.text, SILENT_REPLY_TOKEN)) {
         return false;
       }
       return true;
